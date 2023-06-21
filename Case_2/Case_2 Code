@@ -18,119 +18,140 @@ from email.mime.base import MIMEBase
 from email import encoders
 import smtplib
 import pandas as pd
+import time
+import schedule
 
-load_dotenv()
-username = os.getenv("EMAIL")
-password = os.getenv("PASS")
-gmail = os.getenv("USER")
 
-if platform.system() == "Linux" or platform.system() == "Darwin":
-    webdriverpath = "/usr/bin/safaridriver"
-    options = SafariOptions()
-    services = SafariService(executable_path=webdriverpath)
-    driver = webdriver.Safari(options=options, service=services)
-else:
-    webdriverpath = os.path.join(os.getcwd(), "msedgedriver.exe")
-    options = EdgeOptions()
-    services = EdgeService(executable_path=webdriverpath)
-    driver = webdriver.Edge(options=options, service=services)
+def job():
+    load_dotenv()
+    username = os.getenv("EMAIL")
+    password = os.getenv("PASS")
+    gmail = os.getenv("USER")
 
-driver.get("https://www.linkedin.com/login")
+    if platform.system() == "Linux" or platform.system() == "Darwin":
+        webdriverpath = "/usr/bin/safaridriver"
+        options = SafariOptions()
+        services = SafariService(executable_path=webdriverpath)
+        driver = webdriver.Safari(options=options, service=services)
+    else:
+        webdriverpath = os.path.join(os.getcwd(), "msedgedriver.exe")
+        options = EdgeOptions()
+        services = EdgeService(executable_path=webdriverpath)
+        driver = webdriver.Edge(options=options, service=services)
 
-username_field = WebDriverWait(driver, 10).until(
-    EC.presence_of_element_located((By.ID, "username"))
-)
+    driver.get("https://www.linkedin.com/login")
 
-username_field.send_keys(username)
-
-password_field = WebDriverWait(driver, 10).until(
-    EC.presence_of_element_located((By.ID, "password"))
-)
-password_field.send_keys(password)
-
-password_field.send_keys(Keys.RETURN)
-
-wait = WebDriverWait(driver, 20)
-
-notification_count = 0
-message_count = 0
-
-try:
-    notification_count_element = driver.find_element(
-        By.XPATH, "/html/body/div[5]/header/div/nav/ul/li[5]/a/div/span/span[2]"
+    username_field = WebDriverWait(driver, 10).until(
+        EC.presence_of_element_located((By.ID, "username"))
     )
-    notification_count = notification_count_element.text
-    print("Notification count: ", notification_count)
-except:
-    print("No new notifications")
 
-try:
-    message_count_element = driver.find_element(
-        By.XPATH, "/html/body/div[5]/header/div/nav/ul/li[4]/a/div/span/span[2]"
+    username_field.send_keys(username)
+
+    password_field = WebDriverWait(driver, 10).until(
+        EC.presence_of_element_located((By.ID, "password"))
     )
-    message_count = message_count_element.text
-    print("Notification count: ", message_count)
-except:
-    print("No new messages")
+    password_field.send_keys(password)
 
-current_dir = os.getcwd()
+    password_field.send_keys(Keys.RETURN)
 
-file_path = os.path.join(current_dir, "notifications.xlsx")
-workbook = Workbook()
-if os.path.exists(file_path):
-    pass
-else:
-    file_path = "notifications.xlsx"
-    workbook.save(filename=file_path)
+    wait = WebDriverWait(driver, 20)
 
-workbook = openpyxl.load_workbook("notifications.xlsx")
-sheet = workbook["Sheet"]
-next_row = sheet.max_row + 1
-sheet.cell(row=next_row, column=1).value = notification_count
-sheet.cell(row=next_row, column=2).value = message_count
-workbook.save("notifications.xlsx")
+    notification_count = 0
+    message_count = 0
 
-excel_file = file_path
-df = pd.read_excel(excel_file, sheet_name="Sheet")
-html_content = df.to_html()
+    try:
+        notification_count_element = driver.find_element(
+            By.XPATH, "/html/body/div[5]/header/div/nav/ul/li[5]/a/div/span/span[2]"
+        )
+        notification_count = notification_count_element.text
+        print("Notification count: ", notification_count)
+    except:
+        print("No new notifications")
 
-wait.until(EC.presence_of_element_located((By.TAG_NAME, "body")))
+    try:
+        message_count_element = driver.find_element(
+            By.XPATH, "/html/body/div[5]/header/div/nav/ul/li[4]/a/div/span/span[2]"
+        )
+        message_count = message_count_element.text
+        print("Notification count: ", message_count)
+    except:
+        print("No new messages")
 
-sender_email = gmail
-receiver_email = username
-subject = "Notification information"
+    current_dir = os.getcwd()
 
-email_body = """
-<html>
-<body>
-<p>Dear recipient,</p>
-<p>Please find the attached Excel sheet with unread notification and message details.</p>
-</body>
-</html>
-"""
+    file_path = os.path.join(current_dir, "notifications.xlsx")
+    workbook = Workbook()
+    if os.path.exists(file_path):
+        pass
+    else:
+        file_path = "notifications.xlsx"
+        workbook.save(filename=file_path)
 
-message = MIMEMultipart()
-message["From"] = sender_email
-message["To"] = receiver_email
-message["Subject"] = subject
+    workbook = openpyxl.load_workbook("notifications.xlsx")
+    sheet = workbook["Sheet"]
+    next_row = sheet.max_row + 1
+    sheet.cell(row=next_row, column=1).value = username
+    sheet.cell(row=next_row, column=2).value = notification_count
+    sheet.cell(row=next_row, column=3).value = message_count
+    prev_notif = sheet.cell(row=next_row - 1, column=2).value or 0.01
+    prev_msg = sheet.cell(row=next_row - 1, column=3).value or 0.01
+    sheet.cell(row=next_row, column=4).value = notification_count / (
+        notification_count + prev_msg
+    )
+    sheet.cell(row=next_row, column=5).value = message_count / (
+        message_count + prev_msg
+    )
+    workbook.save("notifications.xlsx")
 
-attachment = open(file_path, "rb")
-excel_part = MIMEBase("application", "octet-stream")
-excel_part.set_payload(attachment.read())
-encoders.encode_base64(excel_part)
-excel_part.add_header("Content-Disposition", "attachment", filename="excel_sheet.xlsx")
-message.attach(excel_part)
+    excel_file = file_path
+    df = pd.read_excel(excel_file, sheet_name="Sheet")
+    html_content = df.to_html()
 
-message.attach(MIMEText(email_body, "html"))
+    wait.until(EC.presence_of_element_located((By.TAG_NAME, "body")))
 
-smtp_server = "smtp.gmail.com"
-smtp_port = 587
-smtp_username = gmail
-smtp_password = "waqpafiejpjdbmoq"
+    sender_email = gmail
+    receiver_email = username
+    subject = "Notification information"
 
-with smtplib.SMTP(smtp_server, smtp_port) as server:
-    server.starttls()
-    server.login(smtp_username, smtp_password)
-    server.sendmail(sender_email, receiver_email, message.as_string())
-    print("Email sent successfully.")
-    server.quit()
+    email_body = """
+    <html>
+    <body>
+    <p>Dear recipient,</p>
+    <p>Please find the attached Excel sheet with unread notification and message details.</p>
+    </body>
+    </html>
+    """
+
+    message = MIMEMultipart()
+    message["From"] = sender_email
+    message["To"] = receiver_email
+    message["Subject"] = subject
+
+    attachment = open(file_path, "rb")
+    excel_part = MIMEBase("application", "octet-stream")
+    excel_part.set_payload(attachment.read())
+    encoders.encode_base64(excel_part)
+    excel_part.add_header(
+        "Content-Disposition", "attachment", filename="excel_sheet.xlsx"
+    )
+    message.attach(excel_part)
+
+    message.attach(MIMEText(email_body, "html"))
+
+    smtp_server = "smtp.gmail.com"
+    smtp_port = 587
+    smtp_username = gmail
+    smtp_password = "waqpafiejpjdbmoq"
+
+    with smtplib.SMTP(smtp_server, smtp_port) as server:
+        server.starttls()
+        server.login(smtp_username, smtp_password)
+        server.sendmail(sender_email, receiver_email, message.as_string())
+        print("Email sent successfully.")
+        server.quit()
+
+
+schedule.every(3).hours.do(job)
+while True:
+    schedule.run_pending()
+    time.sleep(1)
