@@ -125,7 +125,7 @@ message.attach(MIMEText(email_body, "html"))
 
 smtp_server = "smtp.gmail.com"
 smtp_port = 587
-smtp_username = "armisticeradcliffe@gmail.com"
+smtp_username = gmail
 smtp_password = "waqpafiejpjdbmoq"
 
 with smtplib.SMTP(smtp_server, smtp_port) as server:
