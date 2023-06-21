@@ -18,8 +18,7 @@ from email.mime.base import MIMEBase
 from email import encoders
 import smtplib
 import pandas as pd
-import time
-import schedule
+from apscheduler.schedulers.blocking import BlockingScheduler
 
 
 def job():
@@ -96,7 +95,7 @@ def job():
     prev_notif = sheet.cell(row=next_row - 1, column=2).value or 0.01
     prev_msg = sheet.cell(row=next_row - 1, column=3).value or 0.01
     sheet.cell(row=next_row, column=4).value = notification_count / (
-        notification_count + prev_msg
+        notification_count + prev_notif
     )
     sheet.cell(row=next_row, column=5).value = message_count / (
         message_count + prev_msg
@@ -151,7 +150,8 @@ def job():
         server.quit()
 
 
-schedule.every(3).hours.do(job)
-while True:
-    schedule.run_pending()
-    time.sleep(1)
+scheduler = BlockingScheduler()
+
+scheduler.add_job(job, "interval", hours=3)
+
+scheduler.start()
