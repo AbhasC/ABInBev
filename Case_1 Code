@@ -1,0 +1,144 @@
+import pandas as pd
+import numpy as np
+
+db = pd.read_excel('/GCC-ABInBev/Actuals.xlsx')
+db.shape
+db.head()
+db.info()
+
+act7 = db[db['Period'] == 7]
+act7.shape
+act7.head()
+act7.drop_duplicates()
+act7.interpolate()
+
+errcols = ['Amount in LC', 'Quantity']
+act7[errcols] = act7[errcols].clip(lower=0)
+act7i = act7.copy()
+for col in errcols:
+    act7i[col] = act7i[col].apply(lambda x: max(0, x))
+print(act7i)
+
+act7f = act7i[act7i['Amount in LC'] != 0]
+act7f.head(50)
+act7f.shape
+
+bcr = pd.read_excel('/GCC-ABInBev/BR&CR Master.xlsx')
+price = pd.read_excel('/GCC-ABInBev/Price.xlsx')
+bcr.head
+price.head
+bcr.shape
+price.shape
+
+bcr=bcr.drop_duplicates()
+bcr.shape
+price=price.drop_duplicates()
+price.shape
+bcr.rename(columns={'Material Number': 'Material Description'}, inplace=True)
+
+cdb = pd.merge(act7, price, on=['Plant','Material Description'])
+cdb = pd.merge(cdb, bcr, on='Material Description')
+cdb = cdb[~cdb['Bottle'].astype(str).str.contains('Crate', na=False)]
+cdb.head(50)
+cdb.shape
+
+zero_count = cdb['Amount in LC'].value_counts().get(0, 0)
+print(zero_count)
+
+cdb = cdb.interpolate()
+cdb = cdb[cdb['Amount in LC'] != 0]
+cdb.shape
+cdb.head(50)
+
+bcr = bcr[~bcr['Material Description'].astype(str).str.contains('B&CR', na=False)]
+bcr = bcr[~bcr['Material Description'].astype(str).str.contains('Keg', na=False)]
+bcr = bcr[~bcr['Material Description'].astype(str).str.contains('SCRAP', na=False)]
+bcr.shape
+bcr.head(50)
+
+rand = pd.merge(bcr, price, on='Material Description')
+rand.shape
+rand.tail(50)
+
+cdb = cdb.merge(rand, left_on=['Crate'], right_on=['Material Description'], how='inner')
+colsd = ['Material Description_y',	'Bottle_y',	'Crate_y',	'Plant_y']
+cdb = cdb.drop(colsd, axis=1)
+ncn = {'Material Description_x': 'Material Description',
+                    'Plant_x': 'Plant',
+                    ' Price per case _x': 'Price per case',
+                    'Bottle_x': 'Bottle',
+                    'Crate_x': 'Crate',
+                    'Price': 'Crate Price'}
+cdb = cdb.rename(columns=ncn)
+cdb.head(5)
+
+print(cdb.columns.tolist())
+cdb.drop_duplicates()
+cdb.shape
+
+cdb['Bottle Rands'] = cdb['Quantity'] * cdb['Bottle Price']
+cdb['Crate Rands'] = cdb['Quantity'] * cdb['Crate Price']
+
+cdb.drop_duplicates()
+cdb.shape
+
+tgt = pd.read_excel('/GCC-ABInBev/Targets.xlsx')
+tgt = tgt[tgt['Material Number'].notnull()]
+tgt1 = tgt[tgt['Material Number'].str.contains('Bottle:')]
+tgt2 = tgt[tgt['Material Number'].str.contains('Crate:')]
+tgt = pd.concat([tgt1,tgt2], axis=0)
+tgt.shape
+tgt.head(5)
+
+print(tgt['Target Quantity'].var())
+
+print(tgt['Target Value in LC'].var())
+
+print(cdb['Amount in LC'].var())
+
+print(cdb['Quantity'].var())
+
+print(cdb['Quantity'].where(cdb['Plant'] == "AA").var())
+
+print(cdb['Quantity'].where(cdb['Plant'] == "AE").var())
+
+print(cdb['Quantity'].where(cdb['Plant'] == "AC").var())
+
+print(cdb['Quantity'].where(cdb['Plant'] == "AG").var())
+
+print(tgt['Target Quantity'].where(tgt['Plant'] == "AA").var())
+
+print(tgt['Target Quantity'].where(tgt['Plant'] == "AC").var())
+
+print(tgt['Target Quantity'].where(tgt['Plant'] == "AE").var())
+
+print(tgt['Target Quantity'].where(tgt['Plant'] == "AG").var())
+
+print(tgt['Target Quantity'].where(tgt['Material Number'].str.contains("Bottle:")).var())
+
+print(tgt['Target Quantity'].where(tgt['Material Number'].str.contains("Crate:")).var())
+
+import matplotlib.pyplot as plt
+cdb.plot(x='Plant', y='Amount in LC', kind='scatter')
+plt.show()
+
+tgt.plot(x='Plant', y='Target Value in LC', kind='scatter')
+plt.show()
+
+cdb.plot(x='Plant', y='Quantity', kind='line')
+plt.show()
+
+tgt.plot(x='Plant', y='Target Quantity', kind='line')
+plt.show()
+
+cdb.plot(x='Plant', y='Bottle Price', kind='line')
+plt.show()
+
+cdb.plot(x='Plant', y='Crate Price', kind='line')
+plt.show()
+
+cdb['Bottle Rands'].plot(kind='box')
+plt.show()
+
+cdb['Crate Rands'].plot(kind='box')
+plt.show()
